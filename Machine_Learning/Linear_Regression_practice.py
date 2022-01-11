@@ -13,12 +13,16 @@ x_b = np.c_[np.ones((100, 1)), x]
 
 # θ = (X_T * X)-1 * X_T * Y 정규방정식
 theta_best = np.linalg.inv(x_b.T.dot(x_b)).dot(x_b.T).dot(y)
-print(theta_best.shape) # 2 by 1 Matrix
+print(theta_best) # 2 by 1 Matrix
 
 x_new = np.array([[0], [2]])
 x_new_b = np.c_[np.ones((2, 1)), x_new]
 
 prediction = x_new_b.dot(theta_best)
-
+print(prediction)
 # Y = θX ? or 아예 다른 개념
 
+from sklearn.linear_model import LinearRegression
+lin_reg = LinearRegression()
+lin_reg.fit(x,y)
+print(lin_reg.intercept_, lin_reg.coef_)
