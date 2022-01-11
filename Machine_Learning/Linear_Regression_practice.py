@@ -13,10 +13,12 @@ x_b = np.c_[np.ones((100, 1)), x]
 
 # θ = (X_T * X)-1 * X_T * Y 정규방정식
 theta_best = np.linalg.inv(x_b.T.dot(x_b)).dot(x_b.T).dot(y)
-print(theta_best.shape)
+print(theta_best.shape) # 2 by 1 Matrix
 
 x_new = np.array([[0], [2]])
 x_new_b = np.c_[np.ones((2, 1)), x_new]
 
-print(x_new.shape)
-print(x_new_b, x_new_b.shape)
+prediction = x_new_b.dot(theta_best)
+
+# Y = θX ? or 아예 다른 개념
+
