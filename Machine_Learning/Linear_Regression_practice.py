@@ -25,4 +25,6 @@ print(prediction)
 from sklearn.linear_model import LinearRegression
 lin_reg = LinearRegression()
 lin_reg.fit(x,y)
+
+# 위의 theta_best와 같은 값을 얻는다.
 print(lin_reg.intercept_, lin_reg.coef_)
