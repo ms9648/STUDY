@@ -176,11 +176,11 @@ In general, there are two broad classes of data to consider:
 
 <b>일반적으로 고려해야 할 데이터에는 크게 두 종류가 있다.
 1) 원시 비디오 스트림 및 비디오 메타데이터(제목, 설명 등)와 같은 콘텐츠 데이터
-2) 명시적 범주와 암묵적 범주로 더 나눌 수 있는 사용자 활동 데이터.</b>
+2) 명시적 범주와 암묵적 범주로 더 나눌 수 있는 사용자 활동 데이터</b>
 
 Explicit activities include rating a video, favoriting/liking a video, or subscribing to an uploader. 
 
-<b>명시적 활동에는 동영상 등급 매기기, 동영상 선호/좋기, 업로더 구독 등이 포함된다.</b>
+<b>명시적 활동에는 동영상 등급 매기기, 동영상 선호/좋아요, 업로더 구독 등이 포함된다.</b>
 
 Implicit activities are datum generated as a result of users watching and interacting with videos, e.g., user started to watch a video and user watched a large portion of the video (long watch).
 
@@ -274,15 +274,10 @@ Hence, there are many videos for which we will not be able to compute a reliable
 
 <b>따라서, 전체 조회 수(따라서 다른 비디오와의 공동 방문 횟수)가 너무 낮기 때문에 이러한 방식으로 신뢰할 수 있는 관련 비디오 세트를 계산할 수 없는 많은 비디오가 있다.</b>
 
-Note that this is a simplified description. 
-
-<b>이것은 간단한 설명입니다.</b>
-
 In practice there are additional problems that need to be solved—presentation bias, noisy watch data, etc.—and additional data sources beyond co-visitation counts that can be used: 
 sequence and time stamp of video watches, video metadata, etc.
 
-<b>solved-presentation bias, noisy한 시청 비디오 등 여러 문제들이 있다. 그리고 공동 방문 횟수를 넘어 추가적인 데이터 소스들도 사용될 수 있다:  
-time stamp, 메타데이터 등..  
+<b>solved-presentation bias, noisy한 시청 비디오 등 여러 문제들이 있다. 그리고 공동 방문 횟수를 넘어 추가적인 데이터 소스들도 사용될 수 있다: time stamp, 메타데이터 등.  
 (논문에는 자세히 기술하지 않았지만, candidates pool을 만들기 위해 time stamp, 메타데이터 등을 사용했다고 합니다)</b>
 
 The related videos can be seen as inducing a directed graph over the set of videos: For each pair of videos (vi, vj ), there is an edge eij from vi to vj iff vj ∈ Ri, with the weight
@@ -447,11 +442,11 @@ many recommendations they want to see on the homepage.
 
 As mentioned in section 2.4, we compute a ranked list of recommendations but only display a subset at serving time.
 
-<b>섹션 2.4에서 언급한 것처럼, 우리는 추천의 순위 목록을 계산하지만 서비스 시간에는 하위 집합만 표시합니다.</b>
+<b>섹션 2.4에서 언급한 것처럼, 우리는 추천의 순위 목록을 계산하지만 서비스 시간에는 하위 집합만 표시한다.</b>
 
 This enables us to provide new and previously unseen recommendations every time the user comes back to the site, even if the underlying recommendations have not been recomputed.
 
-<b>따라서 기본 추천이 다시 계산되지 않았더라도 사용자가 사이트에 돌아올 때마다 이전에 보지 못했던 새로운 추천을 제공할 수 있습니다.</b>
+<b>따라서 기본 추천이 다시 계산되지 않았더라도 사용자가 사이트에 돌아올 때마다 이전에 보지 못했던 새로운 추천을 제공할 수 있다.</b>
 
 ### <b>2.6 System Implementation</b>
 We choose a batch-oriented pre-computation approach rather than on-demand calculation of recommendations. 
@@ -532,7 +527,7 @@ to the interpretation of a relatively small set of pre-defined metrics.
 
 To evaluate recommendation quality we use a combination of different metrics. 
 
-<b>추천 품질을 평가하기 위해 서로 다른 메트릭의 조합을 사용합니다.</b>
+<b>추천 품질을 평가하기 위해 서로 다른 메트릭의 조합을 사용한다.</b>
 
 The primary metrics we consider include click through rate (CTR), long CTR (only counting
 clicks that led to watches of a substantial fraction of the video), session length, time until first long watch, and recommendation coverage (the fraction of logged in users with
