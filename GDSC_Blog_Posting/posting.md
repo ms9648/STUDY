@@ -51,11 +51,10 @@ featured: true
 2. Diverse and relevant to the user's recent actions
 
 이 시기 유튜브 추천 시스템에서 가장 먼저 직면한 문제는 메타데이터의 부재였습니다. 
-컨텐츠에 대한 피드백도 명확하지가 않으며, 유튜브의 영상들은 휘발성이 강하며 지속적으로 refresh해줄 필요가 있었습니다. 
+컨텐츠에 대한 피드백도 명확하지가 않으며, 유튜브의 영상들은 휘발성이 강하기 때문에 지속적으로 refresh해줄 필요가 있었습니다. 
 따라서 지속적으로 영상을 새로고침 하는 'constant freshness'를 파악하는 것이 매우 중요한 과제였습니다.
 
-# System Design
-
+## System Design
 ![image](Recommendation_system_architecture.png)
 
 유튜브 추천 시스템은 크게 Candidate generation, Ranking 단계로 구분할 수 있습니다. 
@@ -70,24 +69,22 @@ Candidate generation 단계에서는 사용자의 개인 활동(시청, 좋아�
 2010년에 발표된 [The YouTube Video Recommendation System](https://scholar.google.co.kr/scholar?hl=ko&as_sdt=0%2C5&as_vis=1&q=The+YouTube+Video+Recommendation+System&btnG=)에 따르면 [association rule](#용어-정리)을 사용하여 스코어를 생성함으로써 알고리즘을 적용하였습니다.
 $$r(v_{i} ,v_{j}) = \frac{c_{ij}}{f(v_{i} ,v_{j})}$$
 
-association rule을 사용하여 스코어를 생성할 때 co-visitation count를 하나의 섹션에서 일어난 것으로 하되, 공통의 관심사를 정규화 하는 함수인 f(vi, vj)로 나누어 간단하게 계산한다고 합니다.
+Association rule을 사용하여 스코어를 생성할 때 co-visitation count를 하나의 섹션에서 일어난 것으로 하되, 공통의 관심 비디오를 정규화 하는 함수인 f(vi, vj)로 나누어 간단하게 계산한다고 합니다.
 $${f(v_{i} ,v_{j})} = c_i·c_j$$
 
 사용자의 관심사에 가까운 컨텐츠를 추천한다는 목표를 달성하기는 하였지만 사용자에게 새로운 비디오를 추천하지는 못한다는 단점이 있었습니다. 
-이에 유튜브는 추천 범위를 넓히기 위해 비디오 그래프에 대해 제한적인 전이적 폐쇠(limited transitive closure)를 수행하여 각 비디오가 체인되는 과정을 늘림으로써 후보 세트를 확대하였습니다. 이에 따라 커버리지 자체를 늘리는 효과를 가져왔다고 합니다.
+이에 유튜브는 추천 범위를 넓히기 위해 비디오 그래프에 대해 제한적인 [전이적 폐쇠(limited transitive closure)](#용어-정리)를 수행하여 각 비디오가 체인되는 과정을 늘림으로써 후보 세트를 확대하였습니다. 이에 따라 추천되는 영상의 커버리지 자체를 늘리는 효과를 가져왔다고 합니다.
 
 ### 2016년
 2016년에도 여전히 Candidate Generation -> Ranking이란 구조는 동일하였습니다. 
 하지만, [Deep Neural Networks for YouTube Recommendations(2016)](https://scholar.google.co.kr/scholar?hl=ko&as_sdt=0%2C5&as_vis=1&q=Deep+Neural+Networks+for+YouTube+Recommendations&btnG=)을 보면 2010년과 달리 위의 두 layer 모두 neural network로 대체되었다는 것을 알 수 있습니다. 
 
-Candidate generation network는 입력 값으로 사용자의 유튜브 활동 이력을 가져와서 작은 부분 집합(수 백개)의 비디오를 검색합니다. 
-
 ![image](Recommendation_system_candidate_architecture.png)
 
 위 그림과 같이 시청 기록, 검색어 토큰, 업로드 시간 등 각 유저의 정보의 average를 구하였고, 각 벡터를 단순히 이어붙였습니다(concatenate).
 
-이어 붙인 유저의 벡터를 fully connected ReLU라 불리는 함수에 넣어서 출력값으로 각 유저의 User embedding을 얻을 수 있습니다. 
-그런 다음, 출력한 이 유저의 정보를 위의 [softmax 함수](#용어-정리)에 넣어서 그 유저에 대한 각 비디오의 가중치를 얻을 수 있습니다. 
+이어 붙인 유저의 벡터를 fully connected ReLU라 불리는 함수에 넣어서 출력값으로 각 유저의 user embedding을 얻었습니다. 
+그런 다음, 출력한 이 유저의 정보를 위의 [softmax 함수](#용어-정리)에 넣어서 그 유저에 대한 각 비디오의 가중치를 구하였습니다. 
 
 $$ P(w_{t} =i|U,C) = \frac{e^{v_iu}}{\sum{{}_{j\in V}e^{v_ju}}} $$
 
@@ -95,9 +92,11 @@ $$ P(w_{t} =i|U,C) = \frac{e^{v_iu}}{\sum{{}_{j\in V}e^{v_ju}}} $$
 
 위 식은 softmax 함수로, 특정 시간 t에 유저 U가 C라는 context를 가지고 있을 때 각각의 동영상 vi를 볼 확률을 정의한 것입니다. 
 
-Softmax 함수 단계에서는 모든 비디오를 입력 값으로 넣지 않고 Negative Sampling 이라는 방법으로 알맞은 비디오를 추출하여 입력 값으로 넣어줌으로써 성능 개선을 하였습니다.
+Softmax 함수 단계에서는 모든 비디오를 입력 값으로 넣지 않고 [Negative Sampling](#용어-정리) 이라는 방법으로 알맞은 비디오를 추출하여 입력 값으로 넣어줌으로써 성능 개선을 하였습니다. 사용자가 비디오를 전부 시청했다면 해당 비디오는 유저가 positive implicit feedback을 준 것으로 간주합니다. 
 
-여기서 추천 후보 비디오 군을 생성할 때 협업 필터링(collaborative filtering) 방식을 적용하여 개인화 서비스를 제공하였다고 합니다. 협업 필터링을 적용할 때 사용자 간의 유사성으로 Video ID, 검색어 등을 이용하여 구현하여 개인화를 제공하였습니다.
+모든 비디오를 입력 값으로 넣게 되면 대용량이기에 성능이 저하될 수 있음에 반해, Negative Sampling을 사용하면 positive 클래스와 negative 클래스로 나누어 지기 때문에 이진 분류 문제가 됩니다. 이를 통해 연산량에서 효율성을 가질 수 있습니다.
+
+여기서 추천 후보 비디오 군을 생성할 때 [협업 필터링(collaborative filtering)](#협업-필터링(Collaborative-Filtering:-CF)) 방식을 적용하여 개인화 서비스를 제공하였습니다. 협업 필터링을 적용할 때 사용자 간의 유사성으로 Video ID, 검색어 등을 이용하여 구현하여 개인화를 제공하였습니다.
 
 마지막으로 유저의 정보와 softmax의 출력 값을 [Nearest Neighbor 알고리즘](#용어-정리)을 이용하여 상위 N개의 비디오를 얻습니다.
 
@@ -108,8 +107,8 @@ Softmax 함수 단계에서는 모든 비디오를 입력 값으로 넣지 않�
 2. User specificity
 3. Diversification
 
-Video quality는 영상 조회수, 댓글, 좋아요 수, 업로드 시간 등에 따라 결정됩니다. 
-User specificity는 사용자의 시청 기록으로부터 사용자의 선호도를 나타내는 feature를 구합니다. 
+Video quality는 영상 조회수, 댓글, 좋아요 수, 업로드 시간 등에 따라 결정됩니다.
+User specificity는 사용자의 시청 기록으로부터 사용자의 선호도를 나타내는 feature를 구합니다.
 그런 다음, Video quality와 User specificity를 linear combinatin(더하기)로 합산하여 순위를 매깁니다. 
 
 유튜브의 경우 유저가 하나의 관심사만 갖는게 아니기 때문에 최종적인 추천 영상 리스트에는 다양성이 존재해야 했습니다. 
@@ -122,9 +121,7 @@ User specificity는 사용자의 시청 기록으로부터 사용자의 선호�
 Ranking 모델도 동 년도의 candidate generation의 모델과 매우 유사합니다. 
 각 비디오의 정보(feature)를 입력 값으로 넣은 뒤 [fully connected ReLU](#용어-정리)라는 함수에 넣어 순위를 매깁니다. 
 
-Feature들을 생성하는 과정을 feature engineering이라고 합니다. 
-
-각 feature들은 다음과 같이 분류되어집니다.
+Feature들은 다음과 같이 분류되어집니다.
 1. 데이터의 형태
     - 연속형 데이터(Continuous data)
     - 범주형 데이터(Categorical data)
@@ -140,9 +137,19 @@ Feature들을 생성하는 과정을 feature engineering이라고 합니다.
 
 ### 2019년
 
+
+
+# Reference
+[1] Covington, Paul, Jay Adams, and Emre Sargin. "Deep neural networks for youtube recommendations." Proceedings of the 10th ACM conference on recommender systems. 2016.
+
+[2] Davidson, James, et al. "The YouTube video recommendation system." Proceedings of the fourth ACM conference on Recommender systems. 2010.
+
+[3] 
+
 ## 용어 정리
 - [association rule](https://en.wikipedia.org/wiki/Association_rule_learning): 변수 간의 관계를 발견하기 위한 학습 방법
 - [Logistic Regression](https://wikidocs.net/22881): 종속 변수와 독립 변수간의 관계를 함수로 설명하는 방법이다. 종속 변수가 범주형 데이터를 대상으로 하고, 결과가 특정 분류로 나뉜다는 점에서 선형회귀와 구분된다.
 - [Weighted Logistic Regression](https://towardsdatascience.com/weighted-logistic-regression-for-imbalanced-dataset-9a5cd88e68b): 불균형 데이터의 경우에 로지스틱 회귀를 사용하면 소수 클래스의 경우 예측이 정확하지 않다는 장점이 있었습니다. 이를 해결하기 위해 각 클래스에 가중치를 설정하여 더 나은 성능을 유도하는 방식입니다.
 - [Negative Sampling](https://wikidocs.net/69141): Negative Sampling: Word2Vec이 학습 과정에서 전체 단어 집합이 아니라 일부 단어 집합에만 집중할 수 있도록 하는 방법
 - [전이적 폐쇠(transitive closure)](https://www.geeksforgeeks.org/transitive-closure-of-a-graph/): 방향이 있는 그래프가 주어졌을 때 이를 Matrix로 나타내는 방법입니다.
+- [Nearest Neighbor](): 
