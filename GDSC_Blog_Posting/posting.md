@@ -3,12 +3,12 @@ layout: post
 title: "Youtube 알고리즘"
 authors: [ms9648]
 tags: ["유튜브", "추천 시스템", "머신러닝"]
-image: ../Recommendation_system_architecture.png
+image: thumbnail.png
 featured: true
 ---
 
 # 들어가며
-><strong>알고리즘이 나를 여기로 이끌었다.</strong><
+><strong>알고리즘이 나를 여기로 이끌었다.</strong>
 
 평소 유튜브를 자주 시청하는 사람이라면 종종 이런 댓글을 본 적이 있을 것입니다. 
 여기서 유튜브 알고리즘이란 무엇일까요?
@@ -16,7 +16,7 @@ featured: true
 유튜브 알고리즘이란 유튜브가 약 20억 명 이상의 사용자에게 어떤 동영상을 제안할 지 결정하는 추천 시스템입니다. 
 이번 포스팅에서는 Youtube Recommender System 2010, 2016, 2019에 대한 리뷰를 중점으로 진행하겠습니다.
 
-# 추천 시스템? + 보강설명
+# 추천 시스템
 추천 시스템(Recommender System)이란 사용자의 과거 행동 데이터나 다른 데이터를 바탕으로 사용자에게 필요한 정보 및 상품을 추천해주는 시스템입니다. 
 
 추천 시스템 알고리즘의 종류는 크게 다음과 같이 분류됩니다.
@@ -119,7 +119,7 @@ User specificity는 사용자의 시청 기록으로부터 사용자의 선호�
 ![image](Ranking_architecture(2016).png)
 
 Ranking 모델도 동 년도의 candidate generation의 모델과 매우 유사합니다. 
-각 비디오의 정보(feature)를 입력 값으로 넣은 뒤 [fully connected ReLU](#용어-정리)라는 함수에 넣어 순위를 매깁니다. 
+각 비디오의 정보(feature)를 입력 값으로 넣은 뒤 fully connected ReLU라는 함수에 넣어 순위를 매깁니다. 
 
 Feature들은 다음과 같이 분류되어집니다.
 1. 데이터의 형태
@@ -136,20 +136,66 @@ Feature들은 다음과 같이 분류되어집니다.
 이는 추천된 영상을 얼마나 오랫동안 볼 지를 예측하는 것을 목표로 합니다. 감상시간은 안 봤으면 0, 봤으면 그 감상 시간을 가중치로 설정합니다.
 
 ### 2019년
+![image](Ranking_architecture(2019).png)
+
+2019년 논문은 랭킹 모델에 대해 중점적으로 설명하고 있습니다.
+
+지난 논문에서는 가중치를 두어 추천 영상의 순위를 정하였지만 본 논문에서는 Wide & Deep 프레임워크를 채택하여 랭킹 모델을 구성하였습니다. 
+Wide & Deep은 넓은 선형 모델과 딥러닝 모델을 결합한 형태입니다. Wide한 모델이 기억력은 좋지만 추천의 수가 다양하지 않다는 단점이 있어 이를 DNN과 같은 모델과 결합하여 일반화를 보완하고자 한 형태입니다. 
+
+아래는 Wide&Deep 모델을 그림으로 나타낸 것입니다.
+
+![image](Wide_and_Deep.png)
+>출처: https://bcho.tistory.com/1187
+
+먼저, 랭킹 모델에서의 과제는 다음과 같습니다.
+1. 어떤 것을 최적화할지 잘 조정해야 한다.
+2. feedback loop에 빠지지 않도록 selection bias를 효율적으로 제거해야 한다.
+
+![image](MMoE(Paper).png)
+
+먼저 1번 과제의 경우 MMoE구조를 통해 해결하고자 하였습니다. 
+즉, 다음에 어떤 영상을 볼 지를 예측하는 것도 중요하지만 그 영상을 얼마나 시청할 지, 좋아할 지 등 objective를 분리시키는 것이 중요합니다. 
+
+![image](MMoE.png)
+
+MMoE 모델이란 Multi-gate Mixture-of-Experts의 약자로 MoE기반 멀티 테스크 학습 모델입니다. 
+MoE 모델이란 입력 데이터를 서로 다른 패턴으로 학습하는 experts 네트워크를 포함하는 모델입니다. 이는 experts 네트워크에서 데이터의 서로 다른 패턴을 학습한 후에 출력 값을 gating network에서 나온 가중치와 곱해져 최종적으로 학습합니다.
+
+기존의 멀티 테스크 학습 모델이 task간 관련성과 같은 요인들에 민감하다는 단점이 있었습니다. 이에, MMoE 모델에서는 각 task별로 처리하는 gate를 따로 두어 task간 관련성을 배제함으로써 학습 성능을 높였습니다.
 
 
+이를 기반으로 objective를 크게 다음과 같이 분류하였습니다.
+1. binary classification task(유저의 클릭)
+2. regression task(시청 시간)
+
+![image](selection_bias.png)
+
+두 번째 과제의 경우 'shallow tower'를 통해 selection bias를 조절하고자 하였습니다.
+영상의 추천 랭킹 순위와 device Id등 여러 feature를 'shallow tower'라는 함수를 통해 selection bias를 만들어 냈고, 이러한 feature는 missing value로 간주하여 높은 랭킹에 패널티를 주는 방식을 적용하였습니다.
+
+유튜브는 이러한 과정들을 Wide&Deep 프레임워크를 채택하여 적용하였습니다.
+Wide&Deep이란 Wide한 선형 모델과 
+wide -> 기억력은 좋지만 추천 수가 다양하지 않음
 
 # Reference
-[1] Covington, Paul, Jay Adams, and Emre Sargin. "Deep neural networks for youtube recommendations." Proceedings of the 10th ACM conference on recommender systems. 2016.
+[1] Davidson, James, et al. "The YouTube video recommendation system." Proceedings of the fourth ACM conference on Recommender systems. 2010.
 
-[2] Davidson, James, et al. "The YouTube video recommendation system." Proceedings of the fourth ACM conference on Recommender systems. 2010.
+[2] Covington, Paul, Jay Adams, and Emre Sargin. "Deep neural networks for youtube recommendations." Proceedings of the 10th ACM conference on recommender systems. 2016.
 
-[3] 
+[3] Zhao, Zhe, et al. "Recommending what video to watch next: a multitask ranking system." Proceedings of the 13th ACM Conference on Recommender Systems. 2019.
+
+[4] Cheng, Heng-Tze, et al. "Wide & deep learning for recommender systems." Proceedings of the 1st workshop on deep learning for recommender systems. 2016.
+
+[5] 임일, 「Python을 이용한 개인화 추천 시스템」, 도서출판 청람, 2020, p158
+
+[6] towards data science, "multi-task learning with multi-gate mixture-of-experts", https://towardsdatascience.com/multi-task-learning-with-multi-gate-mixture-of-experts-b46efac3268, 2022-01-21
 
 ## 용어 정리
-- [association rule](https://en.wikipedia.org/wiki/Association_rule_learning): 변수 간의 관계를 발견하기 위한 학습 방법
-- [Logistic Regression](https://wikidocs.net/22881): 종속 변수와 독립 변수간의 관계를 함수로 설명하는 방법이다. 종속 변수가 범주형 데이터를 대상으로 하고, 결과가 특정 분류로 나뉜다는 점에서 선형회귀와 구분된다.
-- [Weighted Logistic Regression](https://towardsdatascience.com/weighted-logistic-regression-for-imbalanced-dataset-9a5cd88e68b): 불균형 데이터의 경우에 로지스틱 회귀를 사용하면 소수 클래스의 경우 예측이 정확하지 않다는 장점이 있었습니다. 이를 해결하기 위해 각 클래스에 가중치를 설정하여 더 나은 성능을 유도하는 방식입니다.
-- [Negative Sampling](https://wikidocs.net/69141): Negative Sampling: Word2Vec이 학습 과정에서 전체 단어 집합이 아니라 일부 단어 집합에만 집중할 수 있도록 하는 방법
-- [전이적 폐쇠(transitive closure)](https://www.geeksforgeeks.org/transitive-closure-of-a-graph/): 방향이 있는 그래프가 주어졌을 때 이를 Matrix로 나타내는 방법입니다.
-- [Nearest Neighbor](): 
+- [association rule](https://en.wikipedia.org/wiki/Association_rule_learning): 변수 간의 관계를 발견하기 위한 학습 방법.
+- [Logistic Regression](https://wikidocs.net/22881): 종속 변수와 독립 변수간의 관계를 함수로 설명하는 방법. 종속 변수가 범주형 데이터를 대상으로 하고, 결과가 특정 분류로 나뉜다는 점에서 선형회귀와 구분된다.
+- [Weighted Logistic Regression](https://towardsdatascience.com/weighted-logistic-regression-for-imbalanced-dataset-9a5cd88e68b): 각 클래스에 가중치를 설정하여 더 나은 성능을 유도하는 선형회귀 방식.
+- [Negative Sampling](https://wikidocs.net/69141): Negative Sampling: Word2Vec이 학습 과정에서 전체 단어 집합이 아니라 일부 단어 집합에만 집중할 수 있도록 하는 방법.
+- [전이적 폐쇠(transitive closure)](https://www.geeksforgeeks.org/transitive-closure-of-a-graph/): 방향이 있는 그래프가 주어졌을 때 이를 Matrix로 나타내는 방법.
+- [Nearest Neighbor](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm): 주변의 샘플 정보를 통해 새로운 관측치의 종속 변수값을 예측하는 방법.
+- [softmax](https://en.wikipedia.org/wiki/Softmax_function): 다중 클래스 분류에서 사용되는 활성화 함수.
