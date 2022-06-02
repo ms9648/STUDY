@@ -201,3 +201,511 @@ int main(int argc, char *argv[])
 
 ![Chap2_mutual_exclusion](Chap2_mutual_exclusion.PNG)
 위 그림처럼 프로세스 A가 시간 T1에 자신의 임계 구역에 진입할 경우 프로세스가 시간 T2에 임계구역에 진입하려고 해도 A는 T3에 임계구역에서 나오기 때문에 B는 T3까지 기다렸다가 임계구역에 진입한다.
+
+## Mutual Exclusion with Busy Waiting
+
+상호배제를 얻기 위한 조건
+1. 인터럽트 끄기
+2. 락 변수
+3. 엄격한 교대
+4. Peterson의 해법
+5. TSL 명령어
+
+### 인터럽트 끄기
+각 프로세스가 임계구역에 진입하자마자 인터럽트를 끄고 임계구역에서 나가기 직전에 인터럽트를 켜도록 한다. 이러면 클록 인터럽트가 발생하지 않아 자원이 교차될리없다. CPU는 오직 클록이나 다른 인터럽트의 결과로 프로세스간에 문맥을 교환하므로 인터럽트를 끄면 CPU는 다른 프로세스로 문맥을 교환하지 않는다.
+
+> 사용자 프로세스에게 인터럽트를 끌 권한을 주면 안된다. 만약 사용자 프로세스가 인터럽트를 다시 켜지 않는다면 시스템은 더 이상 동작하지 않기 때문이다.
+
+### 락 변수
+0으로 초기화 된 단일 공유 락변수가 있다. 락이 0이면 프로세스는 임계구역에 들어가기 전에 1로 바꾸고 진입한다. 만약 이미 락이 1이면 프로세스는 락 변수가 0이 될 때까지 기다린다. 
+
+> 스케줄링에 따라 경쟁 조건이 발생할 수 있다. 락을 1로 설정하기 직전에 다른 프로세스가 스케줄되어 실행하면서 락을 1로 설정하고 다시 첫 번째 프로세스가 실행하면 락을 1로 설정하여 두 프로세스가 락을 1로 설정하여 임계구역에 동시에 들어오는 불상사가 생긴다.
+
+### 엄격한 교대
+
+```C++
+/* Process 0 */`
+while (TRUE){
+    while(turn != 0); // turn변수가 0이될 때까지 루프를 돈다.
+    V++; // 임계구역 진입
+    turn = 1; // 임계구역에서 나온다.
+    noncritical_region();
+}
+
+/* Process 1 */
+while (TRUE){
+    while (turn != 1);
+    V++;
+    turn = 0;
+    noncritical_region();
+}
+
+/*
+turn의 초기값은 0이다. Process 1은 turn 변수가 1이될 때까지 반복한다.
+*/
+```
+
+변수가 특정 값이 될 때까지 계속해서 검사하는 것을 바쁜 대기라 한다. 이는 CPU 시간을 낭비하므로 바쁜 대기는 일반적으로 피해야 한다. 바쁜 대기를 사용하는 락을 스핀 락이라 부른다.
+
+한 프로세스가 다른 프로세스보다 상당히 느린 경우 빠른 프로세스가 임계구역에 존재하지 않는 다른 프로세스에 의해 블록되므로 경쟁 조건을 피하기 위한 조건 **3. 임계구역 외부에서 실행하고 있는 프로세스는 다른 프로세스들을 블록시켜서는 안된다.(Progress)** 라는 조건을 위배한다.
+
+### Peterson's Solution
+Dekker는 엄격한 교대를 요구하지 않는 상호배제 문제의 소프트웨어 해결책을 제시하였다.
+```C++
+/* Process 0 */
+flag[0] = TRUE;
+while (flag[1]) {
+    if(turn == 1){
+        flag[0] = FALSE;
+        while (turn == 1);
+        flag[0] == TRUE;
+    }
+}
+V++;
+flag[0] = FALSE;
+turn = 1;
+
+/* Process 1 */
+flag[1] = TRUE;
+while (flag[0]){
+    if (turn == 0){
+        flag[1] = FALSE;
+        while (turn == 0);
+        flag[1] = TRUE;
+    }
+}
+V++;
+flag[1] = FALSE;
+turn 0;
+```
+
+```C++
+#define FALSE 0
+#define TRUE 1
+#define N 2 // 프로세스의 수
+
+int turn;
+int interested[N];
+
+void enter_region(int process) // 프로세스는 0 or 1
+{
+    int other; // 다른 프로세스의 수
+
+    other = 1 - process; // 상대방 프로세스
+    interested[process] = TRUE; // 현재 프로세스를 1로 설정
+    turn = process;
+    while (turn == process && interested[other] == TRUE)
+}
+
+void leave_region(int process)
+{
+    interested[process] = FALSE;
+}
+```
+
+### Bakery Algorithm
+n개의 프로세스가 있을 때 임계구역 솔루션
+
+## TSL Instruction
+하드웨어의 도움을 약간 필요로 하는 해결책이다.
+메모리 워드 LOCK의 값을 읽어 레지스터 REGISTER에 저장하고 메모리 주소 LOCK에 0이 아닌 값을 기록한다.워드를 읽고 값을 저장하는 연산은 분할이 불가능하기 때문에 연산이 완료될 때까지 다른 어떤 처리기도 메모리 워드에 접근할 수 없다. TSL 명령을 수행하는 CPU는 수행이 끝날 때까지 메모리 버스를 잠금으로써 다른 어떤 CPU도 메모리에 접근할 수 없도록 한다.
+
+```
+enter_region:
+    TSL REGISTER, LOCK // LOCK의 값을 레지스터로 복사하고 LOCK을 1로 설정한다.
+    CMP REGISTER, #0 // 이전 값이 0인지 비교한다.
+    JNE enter_region // 만약 1이었으면 LOCK이 이미 이전에 1로 설정된 것이기때문에 서브루틴의 처음으로 돌아가 TSL 명령을 다시 시작한다.
+    RET
+
+leave_region:
+    MOVE LOCK, #0
+    RET
+```
+
+임계구역에 진입하기 위해서 프로세스는 enter_region을 호출하며 이 루틴은 락이 풀릴 떄까지 바쁜 대기를 한 다음 락을 획득하고 복귀한다. 임계구역을 수행한 후 프로세스는 leave_region을 호출하며 이 루틴은 lock에 0을 저장한다.
+
+TSL 명령의 다른 형태가 XCHG이다. 이는 원자적으로 두 곳의 내용을 교환한다(ex. 레지스터와 메모리 워드의 내용)
+
+## Spin Lock Implementation
+
+Version 1: 다른 프로세서가 메모리에 접근을 하지 못하도록 막는 방법
+
+```C++
+void spin_lock(spinlock_t *s){
+    while (test_and_set(s) != 0);
+}
+```
+
+Revised Version
+
+```C++
+void spin_lock(spinlock_t *s){
+    while (test_and_set(s) != 0) {
+        while(*s != 0);
+    }
+}
+```
+
+## The Producer-Consumer Problem
+두 프로세스가 고정된 크기의 버퍼를 공유한다. 하나는 생산자로 정보를 버퍼에 저장하고 다른 하나는 소비자로 버퍼에서 정보를 꺼내 온다.
+
+생산자가 새로운 아이템을 버퍼에 넣으려고 하는데 버퍼가 가득 차 있을 때 문제가 발생한다. 해결책은 생산자가 잠들고 소비자가 아이템을 하나 제거할 때 깨워주는 것이다. 마찬가지로 소비자가 아이템을 버퍼에서 가져오려고 하는데 버퍼가 비어있으면 소비자는 잠들고 생산자가 버퍼에 아이템을 넣을 때 깨워준다.
+
+```C++
+#define N 100
+int count = 0;
+
+void producer(void)
+{
+    int item;
+
+    while (TRUE) {
+        item = produce_item();
+        if (count == N) sleep(); // 가득차면 잠들고
+        insert_item(item);
+        count = count + 1;
+        if (count == 1) wakeup(consumer); // 비어있는 상태에서 한 개를 생산하면 소비자를 깨운다.
+    }
+}
+
+void consumer(void)
+{
+    int item;
+
+    while (TRUE){
+        if (count == 0) sleep(); // 비어있으면 잠들고
+        item = remove_item();
+        count = count - 1;
+        if (count == N-1) wakeup(producer); // 가득 찬 상태에서 한 개를 소비하면 생산자를 깨운다.
+        consume_item(item);
+    }
+}
+```
+
+## Semaphores
+Dijkstra는 세마포어라는 새로운 변수형을 도입하여 깨움이 저장되지 않은 0값 또는 하나 이상의 깨움이 대기 중인 양수 값을 가지도록 하였다.
+
+Dijkstra는 각각 sleep과 wakeup이 일반화 된 down과 up 두 개의 연산을 제안하였다. 세마포어에 대한 down 연산은 값이 0보다 큰 지를 검사한다. 만약 그렇다면 이 값을 감소시키고 수행을 계속한다. 만약 값이 0 값이면 프로세스는 down의 수행을 완료하지 않고 즉시 잠든다.
+
+값을 검사하고, 변경하고, 경우에 따라 잠드는 이러한 모든 동작은 분할할 수 없는 하나의 원자적 행위이다. 이 연산이 완료되거나 프로세스가 잠들 떄까지 다른 프로세스가 세마포어에 접근할 수 없도록 보장되어야 한다.
+
+up 연산은 세마포어의 값을 증가시킨다. 하나 또는 그 이상의 프로세스가 down 연산을 완료할 수 없어서 세마포어 큐에서 잠들어 있으면 이 중 한 프로세스가 시스템에 의해 선택되어 down 수행을 완료할 수 있다. 따라서 프로세스가 잠들어 있는 세마포어에 대해 up을 수행하면 세마포어 값은 여전히 0이지만 잠들어 있는 프로세스의 개수는 하나가 감소한다.
+
+### The Producer-Consumer problem using Semaphores
+```C++
+#define N 100
+typedef int semaphore;
+semaphore mutex = 1; // 생산자와 소비자가 동시에 버퍼에 접근하지 못하도록 하는 변수
+semaphore empty = N; // 빈 슬롯의 개수
+semaphore full = 0; // 아이템으로 채워진 슬롯의 개수
+
+void producer(void)
+{ // empty가 먼저 down되고 mutex가 down되어야 한다.
+    int item;
+
+    while (TRUE) {
+        item = produce_item();
+        down(&empty); // 슬롯이 가득차면 대기한다.
+        down(&mutex);
+        insert_item(item);
+        up(&mutex);
+        up(&full);
+    }
+}
+
+void consumer(void)
+{
+    int item;
+    
+    while (TRUE){
+        down(&full); // 슬롯이 다 비어있으면 대기한다.
+        down(&mutex);
+        item = remove_item();
+        up(&mutex);
+        up(&empty);
+        consume_item(item);
+    }
+}
+```
+
+## Priority Inversion
+우선순위 역전 문제는 프로세스들이 sleep하고 wakeup할 때 발생한다. 
+
+프로세스가 임계구역에 진입하려고 할 때 먼저 진입이 허용되는지 검사하고 허용되지 않으면 허용될 때까지 제자리에서 루프른 돈다.
+이 기법은 CPU시간을 낭비할 뿐 아니라 예기치 못한 결과를 가져온다.
+컴퓨터에 높은 우선순위를 가진 H와 낮은 우선순위를 가진 L 두 프로세스가 실행중이라고 하자. L이 임계구역에 진입하고 난 후에 H가 실행이 가능한 준비 상태가 되면 H가 수행이 된다. 하지만 L이 이미 임계구역에 있으므로 제자리 루프를 돌고, L은 H 때문에 수행되지 않아 임계구역을 벗어나지 못해 H는 무한루프를 돌게 된다.
+이러한 상황을 우선순위 역전 문제라고 부른다.
+
+## Mutex
+세마포어의 단순한 버전으로 세마포어의 개수를 세는 능력이 필요 없는 경우이다.
+
+뮤텍스는 변수로서, unlock, lock 두 가지 중 한 상태를 가진다. 뮤텍스와 함께 두 개의 프로시저가 사용된다. 스레드가 임계구역에 접근할 때 mutex_lock을 호출한다. Unlock(임계구역을 사용할 수 있음을 의미)이면 호출은 성공하고 호출한 스레드는 임계구역에 진입할 수 있다. 
+
+이미 뮤텍스가 Lock 상태이면 스레드는 임계구역에 있는 스레드가 수행을 마치고 mutex_unlock을 호출할 때까지 블록된다. unlock될 때 다수의 스레드가 하나의 뮤텍스에서 대기 중이면 이들 중 하나가 임의로 선택되어 lock을 획득한다.
+
+```C++
+mutex_lock:
+    TSL REGISTER, MUTEX // 뮤텍스를 레지스터로 복사한 후 1로 설정한다.
+    CMP REGISTER, #0 // 뮤텍스 값이 0인지 비교한다.
+    JZE ok // 뮤텍스가 0이었으면 뮤텍스는 unlock되고 return한다.
+    CALL thread_yield // 뮤텍스가 1이면 다른 스레드를 스케줄링한다.
+    JMP mutex_lock // 다시 수행한다.
+ok: RET
+
+mutex_unlock:
+    MOVE MUTEX, #0
+    RET
+```
+TSL 명령어와 차이점은 뮤텍스의 경우 락을 획득하지 못하면 thread_yield를 호출하여 다른 스레드에게 CPU를 양보한다. 결과적으로 바쁜 대기는 존재하지 않게 된다.
+
+thread_yield는 사용자 공간에 있는 스레드 스케줄러를 호출하므로 매우 빠르다. -> 커널을 호출하지 않는다.
+
+
+## Mutex in Pthreads
+![Chap2_Mutex_in_Pthread](Chap2_Mutex_in_Pthread.PNG)
+Pthread_mutex_init: 뮤텍스를 생성한다.
+Pthread_mutex_destroy: 뮤텍스를 파괴한다.
+Pthread_mutex_lock: 락을 설정하며 이미 락이 걸려있으면 대기한다.
+Pthread_mutex_trylock: 락을 획득하기 위해 시도할 때 이미 락이 설정되어 있으면 대기하는 대신 오류코드와 함께 바로 복귀하도록 설정한다. -> 효과적으로 바쁜 대기를 수행할 수 있다.
+Pthread_mutex_unlock: 뮤텍스를 unlock하며 하나 또는 그 이상의 스레드가 대기 중이면 단 하나의 스레드만 진행할 수 있도록 한다. 
+
+![Chap2_Conditional_Variable_in_Pthread](Chap2_Conditional_Variable_in_Pthread.PNG)
+뮤텍스 이외에도 pthread는 조건 변수(conditional variable)라는 동기화 기법을 제공한다. 뮤텍스는 임계구역에 대한 접근을 허용하거나 대기시키는데 적당하다면 조건 변수는 어떤 조건이 만족되지 않으면 스레드의 수행을 대기시킨다.
+
+조건 변수와 뮤텍스는 항상 같이 사용된다. 보통 어떤 스레드가 뮤텍스를 락하고 자신이 필요한 무엇인가가 만족될 때까지 조건 변수에서 대기한다. 그리고 다른 스레드가 신호를 보내면 기다리던 스레드는 진행하게 된다.
+
+Pthread_cond_init: 조건 변수를 생성한다.
+Pthread_cond_destroy: 조건 변수를 파괴한다.
+Pthread_cond_wait: 다른 스레드가 신호를 보낼 때까지 호출한 스레드를 대기시킨다. 점유하고 있는 뮤텍스를 원자적으로 unlock하게 된다. -> 뮤텍스가 인자로 주어져야 한다.
+Pthread_cond_signal: 다른 스레드에게 신호를 보낸다.
+Pthread_cond_broadcast: 잠재적으로 동일한 신호를 기다리는 다수의 스레드가 존재할 수 있는 경우 사용된다.
+
+> 세마포어와 다르게 조건 변수는 과거를 기억해 두지 않는다. 블록된 스레드가 없는 조건 변수에 대해 신호를 보내면 이 신호는 그냥 사라진다. 
+
+```C++
+/* 스레드를 사용하는 생산자-소비자 문제 */
+#include <stdio.h>
+#include <pthread.h>
+#define MAX 1000000000
+
+pthread_mutex_t the mutex;
+Pthread_cond_t condc, condp;
+int buffer = 0;
+
+void *producer(void *ptr)
+{
+    int i;
+    
+    for(i = 1; i <= MAX; i++){
+        pthread_mutex_lock(&the_mutex);
+        while (buffer != 0) pthread_cond_wait(&condp, &the_mutex);
+        buffer = i;
+        pthread_cond_signal(&condc);
+        pthread_mutex_unlock(&the_mutex);
+    }
+    pthread_exit(0);
+}
+
+void *consumer(void *ptr)
+{
+    int i;
+
+    for(i = 1; i<= MAX; i++){
+        pthread_mutex_lock(&the_mutex);
+        while (buffer == 0) pthread_cond_wait(&condc, &the_mutex);
+        buffer = 0;
+        pthread_cond_signal(&condp);
+        pthread_mutex_unlock(&the_mutex);
+    }
+    pthread_exit(0);
+}
+
+int main(int argc, char **argv)
+{
+    pthread_t pro, con;
+    pthread_mutex_init(&the_mutex, 0);
+    pthread_cond_init(&condc, 0);
+    pthread_cond_init(&condp, 0);
+    pthread_create(&con, 0, consumer, 0);
+    pthread_create(&pro, 0, producer, 0);
+    pthread_join(pro, 0);
+    pthread_join(con, 0);
+    pthread_cond_destory(&condc);
+    pthread_cond_destory(&condp);
+    pthread_mutex_destroy(&the_mutex);
+}
+```
+
+## Monitor
+모니터는 특별한 형태의 모듈 또는 패키지에 모아진 프로시저, 변수, 자료구조의 모음이다. 프로세스는 필요하면 언제든 모니터의 프로시저를 호출할 수 있지만 모니터 밖의 프로시저에서 모니터의 내부 자료 구조를 직접 접근하는 것은 불가능하다.
+
+모니터는 프로그래밍 언어 자체가 지원해주는 개념인데, C는 이를 지원하지 않는다.
+```
+monitor example
+    integer i;
+    condition c;
+
+    procedure producer();
+    .
+    .
+    .
+    end;
+
+    procedure consumer();
+    .
+    end;
+end monitor;
+```
+
+모니터는 상호배제를 성취하는데 중요한 속성인 "단 하나의 프로세스만 한 순간에 모니터에서 활동할 수 있다."를 가진다. 
+일반적으로 프로세스가 모니터 프로시저를 호출하면 프로시저의 최초 명령 몇 개가 다른 프로세스가 이미 모니터에서 활동 중인지를 검사한다.
+만약 다른 프로세스가 모니터에서 활동 중이라면 다른 프로세스가 모니터에서 나올 때까지 중단(suspend)된다.
+다른 프로세스가 모니터를 사용하고 있지 않으면 호출한 프로세스는 모니터에 진입한다.
+
+### Producer/Consumer with Hoare's Monitor
+생산자-소비자 문제에서 버퍼가 가득 찰 경우 조건 변수를 사용하여 wait, signal 연산을 통해 해결할 수 있다. 
+모니터 프로시저가 더 이상 진행할 수 없음을 인식하면 어떤 조건 변수에 대해 wait을 수행하고 이 동작은 호출한 프로세스를 대기하게 만든다. 이는 현재 모니터 진입을 금지당하고 있는 다른 프로세스가 모니터에 진입할 수 있게 한다.
+프로세스는 파트너 프로세스가 대기 중인 조건 변수에 대해 signal을 수행하여 대기 중인 파트너를 깨울 수 있다. 이 때,Hoare는 기존 프로세스를 중단시키고 새로 깨어난 프로세스가 수행되어야 한다고 제안하였다.
+
+## Lock-free Data Structure
+CPU는 원자적 CAS(Compare-and-Swap)연산을 제공해야 한다.
+
+## Message Passing
+메시지 패싱을 이용하는 프로세스간 통신은 send와 receive 두 가지 프리미티브를 이용한다. 이는 세마포어처럼 시스템 호출의 일종이다.
+```
+send(destination, message) 
+receive(source, message)
+```
+send 호출은 메시지를 명시된 목적지에 전송하고 receive 호출은 명시된 정보원으로부터 메시지를 받는다. 전달된 메시지가 없으면 수신자는 메시지가 도착할 떄까지 기다린다.
+또는 오류 코드와 함께 즉시 복귀할 수도 있다.
+
+### Synchronization
+- Blocking send, blocking receive
+    - sender와 receiver 모두 메시지가 도착하기 전까지 대기한다.
+    - receive 이전에 send가 호출되면 전송하려는 프로세스는 receive가 호출될 때까지 대기하며, receive가 호출되면 메시지는 중간 단계의 버퍼링 없이 송신자에서 수신자로 직접 복사된다.
+    - 유사하게 receive가 먼저 호출되면 수신자는 send가 호출될 때까지 기다린다.
+    - 이를 랑데뷰(rendezvous)라고 부른다.
+- Nonblocking send, blocking receive
+    - 송신자는 계속해서 send 호출을 한다.
+    - receive는 요청된 메시지가 도착할 때까지 기다린다.
+- Nonblocking send, nonblocking receive
+    - 송신자, 수신자 모두 기다리지 않는다.
+
+### Addressing
+- Direct Addressing
+    - send 호출은 수신자 프로세스의 특정 식별자를 포함한다.
+    - receive 호출은 앞으로 도착을 프로세스 메시지의 순서 번호를 알 수 있다.
+    - receive 호출은 receive 명령이 이루어졌을 때 값을 반환하기 위해 source parameter를 사용할 수 있다.
+
+- Indirect Addressing
+    - 메시지는 큐와 같은 공유된 자료구조에 보내진다.
+    - 큐는 메일박스라고 불린다.
+    - 어떤 프로세스는 메일박스에 메시지를 보내며 다른 프로세스는 메일박스에서 메시지를 고른다.
+    - 즉, 메일바그는 어떤 장소로서 메일박스가 생성될 때 정해진 개수만큼 메시지를 버퍼링할 수 있다.
+
+## Barriers
+![Chap2_Barriers](Chap2_Barriers.PNG)
+어떤 응용들은 단계별로 구성되는데, 모든 프로세스가 다같이 다음 단계로 진행할 준비가 되기 전에 어떤 프로세스만 먼저 다음 단계로 진행할 수 없다는 규칙을 가지고 있다.
+이는 각 단계의 끝에 장벽을 설치함으로써 달성할 수 있다.
+한 프로세스가 장벽에 도착하면, 다른 모든 프로세스가 장벽에 도착할 때까지 이미 도착한 프로세스들은 대기한다.
+
+각 프로세스는 장벽에 도착하면 라이브러리 프로시저를 호출하여 장벽 프리미티브를 수행한다. 마지막 프로세스가 도착하면 모든 프로세스는 장벽을 통과한다.
+
+## 스케줄링
+다음에 실행할 프로세스를 선택하는 것이다.
+- 스케줄링 시점
+    - 프로세스가 생성될 때
+    - 프로세스가 종료할 때
+    - 프로세스가 I/O, 세마포어, 또는 다른 무언가로 대기할 때
+    - I/O 인터럽트가 발생할 때
+    - 선점형(preemptive) 스케줄링 알고리즘의 경우 클럭 인터럽트가 발생할 때 -> 클럭 인터럽트가 발생하면 수행할 프로세스가 변경된다.
+    > 비선점형 스케줄링 알고리즘은 I/O나 대기하거나 CPU를 반환할 때까지 계속해서 수행한다.
+
+- 스케줄링 오버헤드(문맥교환 비용)
+    - 모드 변경비용(사용자 -> 커널 -> 사용자)
+    - 프로세스 문맥 저장, 복구
+    - 메모리 맵 저장 복구
+    - CPU 캐시 무효화
+
+### Scheduling - Process Behavior
+![Chap2_Process_Behavior](Chap2_Process_Behavior.PNG)
+거의 모든 프로세스는 한동안 계산을 수행하다가 다시 한동안 I/O를 요청하는 행동을 반복한다. 시스템 호출이 완료되면 다시 데이터가 필요하거나 데이터를 기록해야 할 때까지 CPU는 계산을 수행하며 이러한 과정이 반복된다.
+
+(a)와 같은 CPU-바운드 프로세스의 경우 대부분의 시간은 계산에 소비하는 반면, (b)와 같은 I/O-바운드 프로세스의 경우 대부분의 시간을 I/O를 기다리면서 보낸다.
+이들을 구분하는 핵심은 CPU 버스트의 길이이다.
+CPU가 빨라질수록 프로세스는 점점 I/O 바운드가 되는 경향이 있다. 디스크에 비해 CPU가 훨씬 더 빨라지면서 이러한 현상이 발생한다.
+
+### Type of Scheduling
+- Long-term scheduling: 새로운 프로세스가 추가될 때
+- Medium-term scheduling: 메인 메모리에 프로세스의 수를 추가할 때
+- Short-term scheduling: 다음에 실행할 프로세스를 결정할 때
+- I/O scheduling
+
+New -> Ready/Suspend: Long-term scheduling
+New -> Ready: Long-term scheduling
+
+Ready -> Running: Short-term scheduling
+
+Blocked/suspend -> Blocked: Medium-term scheduling
+![Chap2_Queuing_Diagram_for_scheduling](Chap2_Queuing_Diagram_for_scheduling.PNG)
+
+## Categories of Scheduling Algorithm
+서로 다른 환경은 서로 다른 스케줄링 알고리즘을 필요로 한다.
+- Batch
+- Interactive
+- Real time
+
+### Scheduling Algorithm Goals
+1. 모든 시스템
+- 공평함: 각 프로세스에게 공평한 몫의 CPU를 할당함
+- 정책 집행: 정책이 집행되는지 관찰함
+- 균형: 시스템의 모든 부분이 활동하도록 함
+
+2. 배치 시스템
+- 성능: 시간당 처리되는 작업의 수를 최대화 함
+- 반환시간: 작업의 제출부터 종료까지 걸리는 시간을 최소화 함
+- CPU 이용률: CPU가 항상 활용되도록 함
+
+3. Interactive(대화식) system
+- 응답시간: 요청에 빠르게 응답하도록 함
+- 비례: 사용자의 기대를 만족시킴
+
+4. Real-time systems
+- 마감시간 만족: 데이터 손실을 방지
+- 예측 가능: 멀티미디어 시스템에서 품질 저하를 방지
+
+### Scheduling in Batch Systems
+1. First-come first-served(선입선출)
+![Chap2_First_Come_First_Served](Chap2_First_Come_First_Served.PNG)
+- 프로세스들은 요청 순서대로 CPU를 할당 받는다. 준비 상태의 프로세스를 위한 단일 큐가 존재한다. 큐가 비어있을 때 첫 작업이 외부로부터 시스템으로 제출되면 이 작업은 즉시 시작하여 원하는 만큼 실행된다. 다른 작업이 도착하면 이들은 큐에 놓인다. 실행중인 프로세스가 대기 상태가 되면 큐의 첫 번째 프로세스가 이어 실행된다.
+
+2. Shortest job first
+![Chap2_Shortest_Job_First](Chap2_Shortest_Job_First.PNG)
+- 실행 시간을 미리 안다고 가정하면 스케줄러는 큐에 있는 프로세스 중 실행 시간이 가장 짧은 최단 작업을 선택한다.
+
+- 모든 작업이 동시에 존재할 때만 최단 작업 우선이 최적이다.
+
+3. Shortest Remaining Time Next
+![Chap2_Shortest_Remaining_Time_Next](Chap2_Shortest_Remaining_Time_Next.PNG)
+- 최단작업우선의 선점형 버전이다. 스케줄러는 항상 프로세스의 남은 실행 시간이 가장 짧은 작업을 선택한다. 여기서도 작업의 실행 시간을 미리 알고 있어야 한다. 새로운 작업이 도착하면 현재 수행 중인 프로세스의 잔여 시간과 비교한다. 현재 프로세스의 잔여 시간보다 새 프로세스의 실행 시간이 더 짧은 경우 현재 프로세스의 작업을 중단시키고 새로운 작업이 실행을 시작한다.
+
+4. Highest Response Ratio Nest(HRRN)
+![Chap2_HRRN](Chap2_HRRN.PNG)
+높은 응답비율을 가진 프로세스를 다음 수행 프로세스로 선택한다.
+
+$ {time \space spent \space waiting \space + \space expected \space service \space time} \over expected \space service \space time $
+
+### Scheduling in Interactive Systems
+- Round-robin scheduling
+- Priority scheduling
+- Multiple queues
+- Shortest process next
+- Guaranteed scheduling
+- Lottery scheduling
+- Fair-share scheduling
+
+1. Round-Robin Scheduling
+![Chap2_Round-Robin_Scheduling](Chap2_Round-Robin_Scheduling.PNG)
+- 각 프로세스에게 시간 할당량이라 불리는 시간 주기가 할당되며 한 번에 이 시간 동안만큼만 실행된다. 프로세스가 할당 시간 동안 실행하면 CPU는 선점되어 다른 프로세스에게 주어진다. 프로세스가 할당 시간이 끝나기 전에 대기하거나 종료하면 CPU는 다른 프로세스로 전환한다. 프로세스가 할당 시간을 소비하면 큐의 맨 뒤에 놓인다.
+
+- 
