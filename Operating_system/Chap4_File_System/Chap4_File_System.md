@@ -211,4 +211,72 @@ i-node는 자료 구조들의 배열로, 파일마다 하나의 i-node자료 구
 다음 블럭을 나타내며 0은 미사용 블럭을 뜻한다.
 전체 블럭이 하나의 엔트리가 필요한데, 이 테이블이 메모리에 존재해야 하기 때문에 메모리가 부족하다. 
 3. Indexed allocation: non-contiguous allocation
+index block이 있고 이는 포함하는 블럭을 순서대로 포함하고 있다. 따라서, index block만 보면 포함하는 데이터 블럭을 알 수 있다. index block을 tree 구조로 만들면 용량 문제를 해결할 수 있다.
 
+### Design of UNIX File System
+![Chap4_UNIX_File_System](image/Chap4_UNIX_File_System.PNG)
+Indexed allocation의 약간의 변형이다.
+첫 번째 블럭은 컴퓨터 부팅에 쓰이는 Boot Block이다.
+두 번째 블럭은 슈퍼 블럭이다. 슈퍼블럭은 전체 파일시스템에 대한 형상 정보를 가지고 있다.
+세 번째는 i-node블럭이다. i-node는 번호로, 파일의 속성과 파일의 디스크 블럭 주소를 가진다. i-node 0, 1번은 안쓰며, 2번은 root 디렉터리이다. i-node는 이름을 가지고 있지는 않다.
+
+그림에서 root 디렉터리는 자신(.)과 부모(..)은 자기 자신이다. 그리고 3, 4, 5, 7에 자식으로 각 파일이 연결되어 있는 것을 볼 수 있다.
+
+디렉터리에는 파일 이름과 i-node가 있으며, 파일 이름을 통해 i-node를 바꾸는 역할을 한다. (i-node 번호를 통해 파일 시스템에서 다른 파일을 찾을 수 있기 때문에)
+
+### UNIX Block Addressing
+유닉스에서 i-node에는 최대 10개 까지의 direct 블럭을 할당할 수 있고 추가적으로 3개의 indirect 블럭을 할당할 수 있다. direct 블럭은 데이터 블럭 번호를 포함하고 있지만 indirect 블럭은 index 블럭의 번호를 포함하며 index 블럭을 확인해야 데이터 블럭 번호를 포함하고 있다. indirect 블럭은 single, double, triple indirect 블럭이 있는데 triple indirect 블럭은 double indirect 블럭을 가리키고 double indirect 블럭은 single indirect 블럭을 가리키고 single indirect 블럭은 index 블럭을 가리킨다.
+
+대용량의 파일을 관리할 수 있다는 장점이 있다. 또, random한 접근이 가능하기 때문에 오버헤드가 FAT FILE SYSTEM보다 작다.
+
+### Implementing Directories
+![Chap4_Directory](image/Chap4_Directory.PNG)
+FAT File 디렉터리의 엔트리에는 파일의 이름 및 파일의 모든 속성 정보를 포함하고 있다. 하지만 UNIX File 시스템의 디렉터리에는 이름과 i-node번호만 포함하고 있고 i-node가 이름을 제외한 파일의 모든 속성을 포함하고 있다.
+
+현대 운영체제는 더 길고 가변적인 파일 이름을 지원한다. 기존의 방식으로는 위 (a), (b) 기법 중 하나를 사용하여 255글자의 공간을 예약해놓는 방법을 썼는데, 이는 너무 많은 오버헤드를 불러 일으킨다. 이를 해결하기 위해 아래와 같은 형태를 구현하였다.
+
+![Chap4_inline_file_name](image/Chap4_inline_file_name.PNG)
+디렉터리의 엔트리 크기를 가변적으로 설정하였다. (a)는 UNIX 파일 시스템의 구조이다(FAT과 비슷). 첫 번째 블럭은 엔트리 길이, 두 번째는 속성, 세 번째는 이름이다. 이름은 4바이트씩 커진다. 각 파일 이름은 특별한 문자(보통 0)로 끝난다.
+
+(b)는 heap에 모든 파일의 이름을 모아놓고 파일 이름의 포인터가 가리키는 방식이다.
+
+### Directory Entry of FAT File System
+![Chap4_FAT_ENTRY](image/Chap4_FAT_ENTRY.PNG)
+
+## Shared Files
+서로 다른 사용자에게 소속된 디렉터리에 공유된 파일이다. 파일은 링크(link)작업을 통해 다른 디렉터리와 파일을 연결할 수 있다.
+
+파일의 소유자 A가 있고 나머지 소유자 B, C가 링크를 걸어서 공유를 하고 있다고 가정하자. A가 파일을 제거하면서 i-node를 같이 제거한다면 B, C는 엉뚱한 파일을 가리키게 된다. 이를 해결하기 위해 바로가기 파일(Symbolic Link File)을 권장한다. 바로가기 파일은 자신이 가리키는 파일의 경로를 가지고 있다.
+
+### Log-Structured File System
+디스크 탐색 시간을 줄여 쓰기 작업의 성능을 높이기 위해 설계되었다. 기본 아이디어는 전체 디스크를 로그 형태로 사용하는 것이다. 주기적으로, 메모리에 버퍼링되어 있는 쓰기 요청을 모아 하나의 세그먼트로 구성한 후, 이러한 하나의 연속적인 세그먼트를 디스크의 로그의 끝에 기록한다.
+각 세그먼트는 i-node, 디렉터리 엔트리, 데이터 블럭을 포함한다.
+i-node는 고정된 위치에 모여있는 것이 아니라 로그 상에서 여기 저기 흩어져 있다.
+
+디스크는 유한하기 때문에 새로운 세그먼트가 쓰이려면 디스크를 비워주어야 한다. 따라서 LFS는 클리너 스레드를 가지고 있다. 클리너는 첫 번째 세그먼트의 요약을 읽어서 어떤 i-node와 파일이 존재하는지 확인하고 i-node 맵을 통해 유효한 블럭을 찾아 다음 세그먼트에 기록한다. 첫 번째 세그먼트는 비워지게 되며 이는 새로운 데이터를 기록하는 로그의 맨 뒷부분으로 사용된다.
+
+i-node map: 모든 i-node의 번호를 가지고 있다. 
+
+### Comparison between LFS and FFS
+![Chap4_FFS_LFS](image/Chap4_FFS_LFS.PNG)
+Unix FFS(Fat File System)은 고정된 위치에 파일이 기록된다. i-node가 있고 i-node는 데이터 블럭을 가리키는 구조이다.
+LFS는 디렉터리가 변경되면 i-node가 변경되고, 파일 데이터가 write되면 i-node는 새로 write된다. 변경이 있으면 writing point에서 순차적으로 계속 기록한다.
+
+### Cleaning(Garbage Collection)
+![Chap4_Cleaning](image/Chap4_Cleaning.PNG)
+LFS는 계속해서 쓰이기 때문에 디스크가 금방 차게 된다. 디스크는 유한하기 때문에 새로운 세그먼트가 쓰이려면 디스크를 비워주어야 한다. 따라서 LFS는 클리너 스레드를 가지고 있다. 클리너는 첫 번째 세그먼트의 요약을 읽어서 어떤 i-node와 파일이 존재하는지 확인하고 i-node 맵을 통해 유효한 블럭을 찾아 다음 세그먼트에 기록한다. 첫 번째 세그먼트는 비워지게 되며 이는 새로운 데이터를 기록하는 로그의 맨 뒷부분으로 사용된다.
+
+### Journaling File System
+유닉스에서 파일 삭제 연산은 다음을 요구한다.
+1. 파일을 디렉터리에서 삭제
+2. I-node를 가용 i-node로 반환
+3. 파일이 차지하던 디스크 블록을 가용 디스크 블록으로 반환
+
+만약 위 단계 도중 시스템이 종료되면 더이상 접근할 수 없는 문제가 발생한다. 이를 해결하는 것이 저널링 파일 시스템이다.
+위와 같이 단계 도중 시스템 크래쉬가 발생하면 부팅할 때 로그를 보고 당시에 어떤 작업을 실행 중이었는지 파악한 다음 해당 작업을 완료한다.
+
+![Chap4_Journaling](image/Chap4_Journaling.PNG)
+
+파일 시스템이 Log Area가 있어서 파일 시스템의 구조를 변경할 때 로그를 남긴다. 구조 변경이 모두 완료되면 로그를 지운다. 만약 변경 도중 시스템 크래쉬가 발생하면 부팅할 때 로그 영역을 보고 다시 실행하거나 롤백한다.
+
+> Fast recovery가 가능하다.
