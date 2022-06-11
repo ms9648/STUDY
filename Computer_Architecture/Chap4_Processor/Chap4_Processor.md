@@ -340,3 +340,146 @@ ID/EX 파이프라인 레지스터에서 레지스터 1의 내용과 부호확�
 ![Chap4_WB_for_Load](Chap4_WB_for_Load.PNG)
 **이 부분은 적재 명령어에만 해당된다.**
 MEM/WB 파이프라인 레지스터에서 데이터를 읽어서 그 데이터를 레지스터 파일의 Write data에 쓴다.
+
+![Chap4_Corrected_Datapath_for_Load](Chap4_Corrected_Datapath_for_Load.PNG)
+**이 부분은 적재 명령어에만 해당된다.**
+위 WB 단계에서 데이터를 레지스터 파일의 Write data에 쓰는데, 파이프라이닝 진행 중에 write 레지스터 번호가 잘못될 수 있다. 따라서 MEM/WB 파이프라인 레지스터의 목적지 레지스터 번호를 레지스터 파일의 Write register 부분에 적어주어야 한다.
+
+![Chap4_EX_for_Store](Chap4_EX_for_Store.PNG)
+**이 부분은 저장 명령어에만 해당된다.**
+레지스터 2의 값을 EX/MEM 파이프라인 레지스터에 저장한다. 또한, ID/EX 파이프라인 레지스터에서 레지스터 1의 내용과 부호확장된 수치 필드를 읽어 ALU에서 덧엠을 한 뒤 EX/MEM 파이프라인 레지스터에 저장한다.
+
+![Chap4_MEM_for_Store](Chap4_MEM_for_Store.PNG)
+**이 부분은 저장 명령어에만 해당된다.**
+ID 단계에서 저장할 데이터를 가지고 있는 레지스터가 읽혔으며, 읽힌 값이 ID/EX에 저장되어 있다. MEM 단계에서 데이터를 사용하려면 EX단계에서 데이터를 EX/MEM에 저장했어야 한다.
+
+![Chap4_WB_for_Store](Chap4_WB_for_Store.PNG)
+**이 부분은 저장 명령어에만 해당된다.**
+저장 명령어의 경우 WB 단계에서는 아무 일도 일어나지 않는다. 파이프라이닝을 유지하기 위해 단계를 유지한다.
+
+## Pipelined Control
+![Chap4_Pipelined_Control](Chap4_Pipelined_Control.PNG)
+파이프라인 데이터패스에 제어선을 추가한 것이다.
+
+1. 명령어 인출: 명령어 메모리를 읽는 제어 신호와 PC에 쓰는 제어 신호는 항상 인가되어 있으므로 이 파이프라인 단계에서는 특별히 제어할 것이 없다.
+2. 명령어 해독/레지스터 파일 읽기: 매 클럭 사이클마다 같은 일이 일어나기 때문에 설정할 제어선이 없다.
+3. 실행/주소 계산: RegDst, ALUOp, ALUSrc을 설정해야 한다. 이 신호들은 목적지 레지스터와 ALU 연산을 선택하고, Read data 2와 부호 확장된 수치값 중 하나를 ALU 입력으로 선택한다.
+4. 메모리 접근: Branch, MemWrite, MemRead를 설정해야 하며 가각 beq, sw, lw 명령어 때 인가된다. branch = 1이고 ALU 결과가 0일때만 PCSrc = 1이 되어 분기 목적지 주소를 선택한다는 것을 기억하라.
+5. 쓰기: MemtoReg, RegWrite를 설정해야 한다. MemtoReg는 레지스터 파일에 ALU 결과를 보낼 것인지 메모리 값을 보낼 것인지를 결정하며, RegWrite는 선택된 값을 레지스터에 쓰게 하는 신호이다.
+
+|신호 이름|인가되지 않은 경우(0)|인가된 경우(1)|
+|-|-|-|
+|RegDst|명령어 rt필드(20:16)가 Write register의 입력이 된다.|명령어 rd필드(15:11)가 Write register의 입력이 된다.|
+|RegWrite|아무 일도 생기지 않는다.|Write register 입력이 지정하는 레지스터에 Write data 입력값을 쓴다.|
+|ALUSrc|레지스터 파일의 두 번째 출력(Read data 2)이 ALU의 두 번째 피연산자가 된다.|부호 확장된 명령어의 하위 16비트가 ALU의 두 번째 피연산자가 된다.|
+|PCSrc|PC+4가 새 PC값이 된다.|분기 목적지 주소가 새로운 PC값이 된다.|
+|MemRead|아무 일도 생기지 않는다.|Address 입력이 지정하는 데이터 메모리 내용을 Read data 출력으로 내보낸다.|
+|MemWrite|아무 일도 생기지 않는다.|Address 입력이 지정하는 데이터 메모리 내용을 Write 입력값으로 바꾼다.|
+|MemtoReg|ALU 출력이 Write data 입력이 된다.|데이터 메모리 출력이 레지스터의 입력이 된다.|
+
+![Chap4_Control](Chap4_Control.PNG)
+
+# 4.7 Data Hazards : Forwarding vs Stalling
+종속성이 있는 프로그램을 살펴보자
+```
+sub $2,  $1, $3
+and $12, $2, $5
+or  $13, $6, $2
+add $14, $2, $2
+sw  $15, 100($2)
+```
+마지막 네 명령어 모두 $2에 있는 첫 번째 명령어 결과에 종속적이다. 
+
+![Chap4_Dependency](Chap4_Dependency.PNG)
+위 그림은 다중 글럭 사이클 파이프라인 다이어그램을 이용하여 위 명령어들의 실행 과정을 보여준다. 첫 번째 명령어의 클럭사이클 5에서 레지스터 $2에 값을 쓰기 때문에 이 값을 원하는 나머지 4개 명령어는 데이터 헤저드가 발생한다.
+
+위 그림에서 $2값을 제대로 읽을 수 있는 명령어는 마지막 두 단계인 add와 sw이다. 나머지는 종속성 선이 역방향으로 갈 때 문제가 발생한다.
+
+이 문제는 전방전달로 해결할 수 있다. 첫 번째 명령 sub에서 $2의 결과가 만들어지는 단계는 클럭 사이클 3인 EX단계의 ALU 결과이므로, EX/MEM 파이프라인 레지스터에 저장된다. 두, 세 번째 명령어 and와 or은 각각 클럭 사이클 4, 5를 시작할 때 필요하므로 전방전달을 이용해서 해결할 수 있다.
+
+일어날 수 있는 데이터 헤저드의 조건은 다음과 같다.
+1a. EX/MEM.RegisterRd = ID/EX.RegisterRs
+1b. EX/MEM.RegisterRd = ID/EX.RegisterRt
+2a. MEM/WB.RegisterRd = ID/EX.RegisterRs
+2b. MEM/WB.RegisterRd = ID/EX.RegisterRt
+
+위 명령어의 and 연산의 경우 sub 명령어의 EX/MEM.RegisterRd = and 명령어의 ID/EX.RegisterRs 이므로 1a조건에 부합한다.
+
+or 연산의 경우 sub 명령어의 MEM/WB.RegisterRd = or 명령어의 ID/EX.RegisterRt 이므로 2b조건을 만족한다.
+
+add, sw 명령어의 경우 데이터 헤저드는 발생하지 않는다.
+
+EX와 MEM 단계에서 WB 제어 필드를 조사하면 RegWrite 신호가 1인지 아닌지 확인할 수 있다. 만약 파이프라인 레지스터 안의 명령어 목적지가 $0이라면(ex. sll $0 $1 $2) 전방 전달을 하면 안 된다. 
+
+따라서 1a, 1b 헤저드 조건에 EX/MEM.RegisterRd != 0을 추가하고, 2a, 2b 헤저드 조건에 MEM/WB.RegisterRd != 0을 추가하면 위 조건들은 제대로 작동할 것이다.
+
+![Chap4_Forwarding_Datapath](Chap4_Forwarding_Datapath.PNG)
+위 그림은 전방전달이 추가된 데이터패스이다.
+ForwardA = 00
+- ALU의 첫 번째 피연산자가 ID/EX로부터 온 레지스터 파일값이다.
+ForwardA = 10
+- 직전의 ALU결과(EX/MEM에서 옴)가 ALU의 첫 번째 피연산자로 온다.
+ForwardA = 01
+- 데이터 메모리나 전전 ALU의 결과(MEM/WB에서 옴)가 첫 번째 피연산자로 전방전달된다.
+ForwardB = 00
+- ID/EX로부터 온 레지스터 파일값이 ALU의 두 번째 피연산자가 된다.
+ForwardB = 10
+- 직전의 ALU결과(EX/MEM에 있음)가 ALU의 두 번째 피연산자로 전방전달된다.
+ForwardB = 01
+- 데이터 메모리나 전전 ALU 결과(MEM/WB)가 ALU의 두 번째 피연산자가 된다.
+
+## Double Data Hazard
+```
+add $1 $1 $2
+add $1 $1 $3
+add $1 $1 $4
+```
+위 명령어의 경우 두 개의 데이터 헤저드가 일어나기 때문에 최근의 값을 쓰는 것이 맞다. 따라서 MEM 해저드 조건을 EX 해저드가 일어날 때는 발생시키지 않는다.
+
+따라서 MEM 헤저드 조건은 다음과 같다.
+```C
+if (MEM/WB.RegWrite and (MEM/WB.RegisterRd != 0)
+    and not(EX/MEM.RegWrite and (EX/MEM.RegisterRd != -) and (EX/MEM.Register.Rd = ID/EX.RegisterRs))
+    and (MEM/WB.RegisterRd = ID/EX.RegisterRs))
+    ForwardA = 01
+
+if (MEM/WB.RegWrite and (MEM/WB.RegisterRd != 0)
+    and not(EX/MEM.RegWrite and (EX/MEM.RegisterRd != -) and (EX/MEM.Register.Rd = ID/EX.RegisterRt))
+    and (MEM/WB.RegisterRd = ID/EX.RegisterRt))
+    ForwardB = 01
+```
+
+## Load-Use Data Hazard
+적재 명령어를 뒤따르는 명령어가 적재 명령어에서 쓰기를 행하는 레지스터를 읽으려고할 때 문제가 생긴다.
+
+![Chap4_Load_use](Chap4_Load_use.PNG)
+따라서, 적재 명령어 뒤에 이 결과값을 읽는 명령어가 나오면 누군가가 파이프라인을 지연시켜야 한다.
+따라서, 전방전달 유닛 외에 해저드 검출 유닛을 사용하여 ID단계에서 동작해서 적재 명령어와 결과값 사용 사이에 지연을 추가하도록 한다.
+적재 명령어만 검사하면 되므로 다음과 같은 조건을 얻는다.
+```C
+if (ID/EX.MemRead and ((ID/EX.RegisterRt = IF/ID.RegisterRs) or (ID/EX.RegisterRt = IF/ID.RegisterRt)))
+    stall the pipeline
+```
+위 명령어는 
+1. ID/EX.MemRead 신호가 1일 때(적재 명령어일 경우)
+2. ID/EX.RegisterRt = IF/ID.RegisterRs 일 때(EX단계에 있는 목적지 레지스터 필드가 ID단계에 있는 근원지 레지스터 rs, rt와 같은지 검사)
+
+조건이 충족되면 명령어는 한 클럭 사이클만큼 지연된다.
+ID 단계에 있는 명령어가 지연되면 IF단계에 있는 명령어는 자동으로 지연되어야 한다. 이를 위해서는 PC와 IF/ID 파이프라인 레지스터를 멈추면 된다. 만약 PC값과 IF/ID 레지스터 값이 그대로이면 IF단계는 PC값을 이용하여 똑같은 명령어를 다시 읽고, ID단계는 IF/ID 레지스터 값을 이용하여 rs, rt를 다시 읽으면 된다. 파이프라인이 아무것도 하지 않는 상태를 명령어 nop을 실행하는 상태라고 한다.
+
+nop을 파이프라인에 삽입하는 방법은 ID/EX 파이프라인 레지스터의 EX, MEM, WB 제어 필드 값을 모두 0으로 만들면 된다.
+
+## Control Hazards
+제어 헤저드는 분기와 관련된 파이프라인 해저드이다.
+제어 해저드를 해결하는 방법을 살펴보자.
+### 분기가 일어나지 않는다고 가정
+분기가 끝날 때까지 파이프라인을 지연시키는 것은 너무 느리기 때문에 분기가 일어나지 않는다고 예측한다.
+만약 분기가 일어난다면 IF, ID 단계까지 온 명령어들을 버리고 분기 목적지에서 실행을 계속한다. 
+명령어를 버리기 위해서는 nop 명령어를 추가할 때와 같이 제어선의 값을 모두 0으로 만들면 된다. 차이가 있다면 분기 명령어가 MEM 단계에 도착했을 때 IF, ID, EX 단계에 있는 명령어 3개를 바꿔야 한다.
+
+### 분기에 따른 지연 줄이기
+분기 성능을 향상시키는 방법 중 하나는 분기가 일어났을 때의 비용을 줄이는 것이다. 분기 명령어의 경우 다음 PC값은 MEM단계에서 선정되는데, 이를 좀 더 빨리하면 제거할 명령어 수가 줄어들게 된다.
+
+분기 결정이 좀 더 빨리 일어나려면 분기 목적지 주소를 계산하는 것과 분기 여부를 판단하는 것 두 가지 일이 좀 더 빨리 일어나야 한다. 더 쉬운 방법은 분기 주소 계산을 빨리하는 것이다. IF/ID 파이프라인 레지스터에는 이미 PC값과 수치 필드가 들어있다. 따라서, 분기 덧셈기를 EX단계에서 ID단계로 끌어올리기만 하면 해결된다.
+
+분기 여부에 대한 판단은 좀 어렵다. beq 명령어의 경우 ID단계에서 읽은 두 레지스터 값을 비교하여야 한다. 두 레지스터 값을 비트별로 XOR연산하고 그 결과 비트들을 OR하여 같은지 검사한다. 그래서, 분기 여부 판단을 ID로 끌어 올리는 것은 전방전달 유닛의 추가와 해저드 검출 하드웨어의 추가를 요구한다.
